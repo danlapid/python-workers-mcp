@@ -1,159 +1,6 @@
-from asyncio import Future, Event, Queue, ensure_future, sleep, create_task
+from asyncio import Event, Future, Queue, create_task, ensure_future, sleep
 from contextlib import contextmanager
 from inspect import isawaitable
-import typing
-
-if typing.TYPE_CHECKING:
-    from typing import (
-        Any,
-        Callable,
-        Literal,
-        Optional,
-        Protocol,
-        TypedDict,
-        Union,
-        NotRequired,
-    )
-    from collections.abc import Awaitable, Iterable, MutableMapping
-
-    class HTTPRequestEvent(TypedDict):
-        type: Literal["http.request"]
-        body: bytes
-        more_body: bool
-
-    class HTTPResponseDebugEvent(TypedDict):
-        type: Literal["http.response.debug"]
-        info: dict[str, object]
-
-    class HTTPResponseStartEvent(TypedDict):
-        type: Literal["http.response.start"]
-        status: int
-        headers: NotRequired[Iterable[tuple[bytes, bytes]]]
-        trailers: NotRequired[bool]
-
-    class HTTPResponseBodyEvent(TypedDict):
-        type: Literal["http.response.body"]
-        body: bytes
-        more_body: NotRequired[bool]
-
-    class HTTPResponseTrailersEvent(TypedDict):
-        type: Literal["http.response.trailers"]
-        headers: Iterable[tuple[bytes, bytes]]
-        more_trailers: bool
-
-    class HTTPServerPushEvent(TypedDict):
-        type: Literal["http.response.push"]
-        path: str
-        headers: Iterable[tuple[bytes, bytes]]
-
-    class HTTPDisconnectEvent(TypedDict):
-        type: Literal["http.disconnect"]
-
-    class WebSocketConnectEvent(TypedDict):
-        type: Literal["websocket.connect"]
-
-    class WebSocketAcceptEvent(TypedDict):
-        type: Literal["websocket.accept"]
-        subprotocol: NotRequired[str | None]
-        headers: NotRequired[Iterable[tuple[bytes, bytes]]]
-
-    class _WebSocketReceiveEventBytes(TypedDict):
-        type: Literal["websocket.receive"]
-        bytes: bytes
-        text: NotRequired[None]
-
-    class _WebSocketReceiveEventText(TypedDict):
-        type: Literal["websocket.receive"]
-        bytes: NotRequired[None]
-        text: str
-
-    WebSocketReceiveEvent = Union[
-        _WebSocketReceiveEventBytes, _WebSocketReceiveEventText
-    ]
-
-    class _WebSocketSendEventBytes(TypedDict):
-        type: Literal["websocket.send"]
-        bytes: bytes
-        text: NotRequired[None]
-
-    class _WebSocketSendEventText(TypedDict):
-        type: Literal["websocket.send"]
-        bytes: NotRequired[None]
-        text: str
-
-    WebSocketSendEvent = Union[_WebSocketSendEventBytes, _WebSocketSendEventText]
-
-    class WebSocketResponseStartEvent(TypedDict):
-        type: Literal["websocket.http.response.start"]
-        status: int
-        headers: Iterable[tuple[bytes, bytes]]
-
-    class WebSocketResponseBodyEvent(TypedDict):
-        type: Literal["websocket.http.response.body"]
-        body: bytes
-        more_body: NotRequired[bool]
-
-    class WebSocketDisconnectEvent(TypedDict):
-        type: Literal["websocket.disconnect"]
-        code: int
-        reason: NotRequired[str | None]
-
-    class WebSocketCloseEvent(TypedDict):
-        type: Literal["websocket.close"]
-        code: NotRequired[int]
-        reason: NotRequired[str | None]
-
-    class LifespanStartupEvent(TypedDict):
-        type: Literal["lifespan.startup"]
-
-    class LifespanShutdownEvent(TypedDict):
-        type: Literal["lifespan.shutdown"]
-
-    class LifespanStartupCompleteEvent(TypedDict):
-        type: Literal["lifespan.startup.complete"]
-
-    class LifespanStartupFailedEvent(TypedDict):
-        type: Literal["lifespan.startup.failed"]
-        message: str
-
-    class LifespanShutdownCompleteEvent(TypedDict):
-        type: Literal["lifespan.shutdown.complete"]
-
-    class LifespanShutdownFailedEvent(TypedDict):
-        type: Literal["lifespan.shutdown.failed"]
-        message: str
-
-    WebSocketEvent = Union[
-        WebSocketReceiveEvent, WebSocketDisconnectEvent, WebSocketConnectEvent
-    ]
-
-    ASGIReceiveEvent = Union[
-        HTTPRequestEvent,
-        HTTPDisconnectEvent,
-        WebSocketConnectEvent,
-        WebSocketReceiveEvent,
-        WebSocketDisconnectEvent,
-        LifespanStartupEvent,
-        LifespanShutdownEvent,
-    ]
-
-    ASGISendEvent = Union[
-        HTTPResponseStartEvent,
-        HTTPResponseBodyEvent,
-        HTTPResponseTrailersEvent,
-        HTTPServerPushEvent,
-        HTTPDisconnectEvent,
-        WebSocketAcceptEvent,
-        WebSocketSendEvent,
-        WebSocketResponseStartEvent,
-        WebSocketResponseBodyEvent,
-        WebSocketCloseEvent,
-        LifespanStartupCompleteEvent,
-        LifespanStartupFailedEvent,
-        LifespanShutdownCompleteEvent,
-        LifespanShutdownFailedEvent,
-    ]
-
 
 ASGI = {"spec_version": "2.0", "version": "3.0"}
 
@@ -251,8 +98,9 @@ async def start_application(app):
     return shutdown
 
 
-async def process_request(app, req, env):
+async def process_request(app, req, env, ctx):
     from js import Object, Response, TransformStream
+
     from pyodide.ffi import create_proxy
 
     status = None
@@ -274,14 +122,12 @@ async def process_request(app, req, env):
     await receive_queue.put({"body": b"", "more_body": False, "type": "http.request"})
 
     async def receive():
-        print("Receiving")
         message = None
         if not receive_queue.empty():
             message = await receive_queue.get()
         else:
             await finished_response.wait()
             message = {"type": "http.disconnect"}
-        print(f"Received {message}")
         return message
 
     # Create a transform stream for handling streaming responses
@@ -290,12 +136,11 @@ async def process_request(app, req, env):
     writable = transform_stream.writable
     writer = writable.getWriter()
 
-    async def send(got: "ASGISendEvent"):
+    async def send(got):
         nonlocal status
         nonlocal headers
         nonlocal is_sse
 
-        print(got)
         if got["type"] == "http.response.start":
             status = got["status"]
             # Like above, we need to convert byte-pairs into string explicitly.
@@ -305,20 +150,18 @@ async def process_request(app, req, env):
                 if k.lower() == "content-type" and v.lower().startswith(
                     "text/event-stream"
                 ):
-                    print("SSE RESPONSE")
                     is_sse = True
-
-                    # For SSE, create and return the response immediately after http.response.start
-                    resp = Response.new(
-                        readable, headers=Object.fromEntries(headers), status=status
-                    )
-                    result.set_result(resp)
                     break
+            if is_sse:
+                # For SSE, create and return the response immediately after http.response.start
+                resp = Response.new(
+                    readable, headers=Object.fromEntries(headers), status=status
+                )
+                result.set_result(resp)
 
         elif got["type"] == "http.response.body":
             body = got["body"]
             more_body = got.get("more_body", False)
-            print(f"{body=}, {more_body=}")
 
             # Convert body to JS buffer
             px = create_proxy(body)
@@ -337,6 +180,7 @@ async def process_request(app, req, env):
                     buf.data, headers=Object.fromEntries(headers), status=status
                 )
                 result.set_result(resp)
+                await writer.close()
                 finished_response.set()
 
     # Run the application in the background to handle SSE
@@ -346,17 +190,13 @@ async def process_request(app, req, env):
 
             # If we get here and no response has been set yet, the app didn't generate a response
             if not result.done():
-                await writer.close()  # Close the writer
-                finished_response.set()
-                result.set_exception(
-                    RuntimeError("The application did not generate a response")
-                )
+                raise RuntimeError("The application did not generate a response")  # noqa: TRY301
         except Exception as e:
             # Handle any errors in the application
             if not result.done():
+                result.set_exception(e)
                 await writer.close()  # Close the writer
                 finished_response.set()
-                result.set_exception(e)
 
     # Create task to run the application in the background
     app_task = create_task(run_app())
@@ -367,7 +207,13 @@ async def process_request(app, req, env):
     # For non-SSE responses, we need to wait for the application to complete
     if not is_sse:
         await app_task
-    print(f"Returning response! {is_sse}")
+    else:  # noqa: PLR5501
+        if ctx is not None:
+            ctx.waitUntil(create_proxy(app_task))
+        else:
+            raise RuntimeError(
+                "Server-Side-Events require ctx to be passed to asgi.fetch"
+            )
     return response
 
 
@@ -423,9 +269,9 @@ async def process_websocket(app, req):
     return Response.new(None, status=101, webSocket=client)
 
 
-async def fetch(app, req, env):
+async def fetch(app, req, env, ctx=None):
     shutdown = await start_application(app)
-    result = await process_request(app, req, env)
+    result = await process_request(app, req, env, ctx)
     await shutdown()
     return result
 
