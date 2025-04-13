@@ -274,14 +274,12 @@ async def process_request(app, req, env):
     await receive_queue.put({"body": b"", "more_body": False, "type": "http.request"})
 
     async def receive():
-        print("Receiving")
         message = None
         if not receive_queue.empty():
             message = await receive_queue.get()
         else:
             await finished_response.wait()
             message = {"type": "http.disconnect"}
-        print(f"Received {message}")
         return message
 
     # Create a transform stream for handling streaming responses
@@ -295,7 +293,6 @@ async def process_request(app, req, env):
         nonlocal headers
         nonlocal is_sse
 
-        print(got)
         if got["type"] == "http.response.start":
             status = got["status"]
             # Like above, we need to convert byte-pairs into string explicitly.
@@ -305,7 +302,6 @@ async def process_request(app, req, env):
                 if k.lower() == "content-type" and v.lower().startswith(
                     "text/event-stream"
                 ):
-                    print("SSE RESPONSE")
                     is_sse = True
 
                     # For SSE, create and return the response immediately after http.response.start
@@ -318,7 +314,6 @@ async def process_request(app, req, env):
         elif got["type"] == "http.response.body":
             body = got["body"]
             more_body = got.get("more_body", False)
-            print(f"{body=}, {more_body=}")
 
             # Convert body to JS buffer
             px = create_proxy(body)
@@ -367,7 +362,6 @@ async def process_request(app, req, env):
     # For non-SSE responses, we need to wait for the application to complete
     if not is_sse:
         await app_task
-    print(f"Returning response! {is_sse}")
     return response
 
 
