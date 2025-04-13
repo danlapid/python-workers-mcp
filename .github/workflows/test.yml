@@ -1,0 +1,54 @@
+name: Test Deploy CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  vendoring:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Run vendoring (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          python3.12 -m venv .venv
+          source .venv/bin/activate
+          .venv/bin/pip install pyodide-build
+          .venv/bin/pyodide venv .venv-pyodide
+          .venv-pyodide/bin/pip install -t src/vendor -r vendor.txt
+
+      - name: Run vendoring (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\Activate.ps1
+          .venv\Scripts\pip install pyodide-build
+          .venv\Scripts\pyodide venv .venv-pyodide
+          .venv-pyodide\Scripts\pip install -t src/vendor -r vendor.txt
+
+      - name: Test worker deployment
+        run: wrangler deploy --dry-run
