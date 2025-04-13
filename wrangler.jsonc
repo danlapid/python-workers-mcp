@@ -7,7 +7,7 @@
     ],
     "compatibility_date": "2025-04-10",
     "vars": {
-        "API_HOST": "example.com"
+        "MESSAGE": "hello world"
     },
     "rules": [
         {

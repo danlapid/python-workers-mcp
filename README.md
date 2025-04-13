@@ -1,6 +1,6 @@
-# Python Workers: FastMCP Example
+# Python Workers: FastAPI-MCP Example
 
-This is an example of a Python Worker that uses the FastMCP package.
+This is an example of a Python Worker that uses the FastAPI-MCP package.
 
 ## Adding Packages
 
