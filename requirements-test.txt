@@ -2,4 +2,3 @@ pytest
 requests
 mcp
 pytest-asyncio
-ruff

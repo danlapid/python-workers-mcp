@@ -1,3 +1,3 @@
-source .venv/bin/activate
+source .venv-pyodide/bin/activate
 pip install -r requirements-test.txt
-pytest tests
+python -m pytest tests
