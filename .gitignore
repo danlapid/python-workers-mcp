@@ -1,5 +1,6 @@
 .venv/
-.venv-pyodide/
+.venv-workers/
+.ruff_cache/
 .pytest_cache/
 node_modules/
 package-lock.json

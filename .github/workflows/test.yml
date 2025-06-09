@@ -19,27 +19,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Install project dependencies
-        run: npm install
-
-      - name: Run build with npm script
-        run: npm run build
+        run: uv sync
       
       - name: Lint and format
-        run: npm run lint
+        run: |
+          uv run ruff format . --check
+          uv run ruff check .
 
       - name: Test worker deployment
-        run: npm run deploy -- --dry-run
+        run: uv run pywrangler deploy --dry-run
       
       - name: Run tests
-        run: npm run test
+        run: uv run pytest tests
