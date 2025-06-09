@@ -1,16 +1,28 @@
+[project]
+name = "python-mcp"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = ["mcp", "structlog"]
+
+[dependency-groups]
+dev = ["workers-py", "pytest", "requests", "pytest-asyncio", "ruff"]
+
+# [tool.uv.sources]
+# workers-py = { path = "../workers-py" }
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "B",  # flake8-bugbear
-    "I",  # isort
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "I",   # isort
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
-    "N",  # pep8-naming
-    "RUF",  # ruff-specific rules
+    "N",   # pep8-naming
+    "RUF", # ruff-specific rules
 ]
 ignore = []
 

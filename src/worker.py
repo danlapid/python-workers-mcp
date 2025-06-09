@@ -10,6 +10,7 @@ def setup_server():
     from starlette.middleware.cors import CORSMiddleware
 
     from exceptions import HTTPException, http_exception
+
     mcp = FastMCP("Demo", stateless_http=True)
 
     @mcp.tool()

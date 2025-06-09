@@ -1,9 +1,0 @@
-pytest
-requests
-mcp
-pytest-asyncio
-ruff
-mcp
-structlog
-webtypy
-pyodide-py
