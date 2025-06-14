@@ -35,7 +35,9 @@ def setup_server():
 
     app = mcp.streamable_http_app()
     app.add_exception_handler(HTTPException, http_exception)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(
+        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    )
     return mcp, app
 
 
