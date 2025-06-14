@@ -1,5 +1,5 @@
 {
-    "name": "python-mcp-worker",
+    "name": "python-mcp-server",
     "main": "src/worker.py",
     "compatibility_flags": [
         "python_workers",
