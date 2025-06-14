@@ -5,10 +5,13 @@ requires-python = "==3.12.*"
 dependencies = ["mcp", "structlog"]
 
 [dependency-groups]
-dev = ["workers-py", "pytest", "requests", "pytest-asyncio", "ruff"]
-
-# [tool.uv.sources]
-# workers-py = { path = "../workers-py" }
+dev = [
+    "workers-py@git+https://github.com/cloudflare/workers-py",
+    "pytest",
+    "requests",
+    "pytest-asyncio",
+    "ruff",
+]
 
 [tool.ruff]
 target-version = "py312"
